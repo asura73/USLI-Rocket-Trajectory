@@ -33,17 +33,17 @@ function res=boost(t, U)
     
     %Unpack Vector
     Vr = U(1:3);  %Velocity
-    Hr = U(4:6);  %Height
+    Hr = U(4:6);  %Position
     Mr = U(7);  %Mass
     Ang = U(8);
     
     h = Hr(3);
     T = ((15-0.0065*h)+273)*1.8;  %temperature(R) at a given altitude from
                                   %Toussaint's Formula
-    p = p0*exp(-32.2/(R*T))*h; %Pressure at a given altitude
+    p = p0*exp(-g/(R*T))*h; %Pressure at a given altitude
     %Calculate Acceleration
     
-    % Thrust = thrust * ihat
+   Tvec_nwz = inv(rotmat(2,5/180*pi))*[0;0;Thrust]; 
      
     A_rocket = (Ft/Mr -g-.5/Mr*Cd*p*A*Vr(3)^2)*Vr;
     Vr(3)=A_rocket*Tf/n;
