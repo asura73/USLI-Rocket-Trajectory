@@ -12,24 +12,28 @@ Mp = 1.25156;     %Propellant Mass (lb)
 Mi = 10.7;     %Initial Launch Mass (lb)
 It = 213.4;      %Total Impulse (Pound-Seconds)
 Tf = 6.40;      %Burn Time (s)
-Ft = 33.4;      %Average Thrust (lb)
+Thrust = 33.4;      %Average Thrust (lb)
 R = 1545.4;     % Gas constant (ft*lbf/(lbmol*R))
 g = 32.2;
+Cd = 0.5;
 theta = 5/180*pi;
 
-initial = [[0;0;0];[0;0;0];0;theta];
+initial = [[0;0;0];[0;0;0];Mi;theta];
 time = linspace(0,Tf,n); 
 
 
-[Tb, Ub] = ode45(@boost, time, initial);
+[Tb, Ub] = ode45(@boost, [0 20], initial);
 
-function res=boost(t, U)
+
+function xvecd =boost(t, U)
     %Differential Equation Function for Solving with ode45
     %Inputs: Time, Input Vector
     %Input Vector: velocity,height,mass
     %Outputs: Output Vector
     %Output Vector: acceleration,velocity,mass rate of change
     
+    r2d = 180 / pi;
+    d2r = 1/r2d;
     
     %Unpack Vector
     Vr = U(1:3);  %Velocity
@@ -43,16 +47,35 @@ function res=boost(t, U)
     p = p0*exp(-g/(R*T))*h; %Pressure at a given altitude
     %Calculate Acceleration
     
-   Tvec_nwz = inv(rotmat(2,5/180*pi))*[0;0;Thrust]; 
+    Tvec_nwz = inv(rotmat(2,Ang))*[0;0;Thrust]; 
      
-    A_rocket = (Ft/Mr -g-.5/Mr*Cd*p*A*Vr(3)^2)*Vr;
-    Vr(3)=A_rocket*Tf/n;
+    %A_rocket = [0;0;(Thrust/Mr -g-.5/Mr*Cd*p*A*Vr(3)^2)];
+    %Vr(3)=A_rocket*Tf/n;
 
-    %Calculate Mass Rate of Change as Function of Current Thrust
-    dM = -Ft*Mp/It;
+    rvecd_NWZ = Vr;
+    rvecd_IKJ = rotmat(2,5*d2r)*rvecd_NWZ;
     
+    
+    F_khat = Thrust-Mr*g-.5*rho*A*rvecd_IJK(3)^2*Cd;
+    Fvec_IJK = [0;0;F_khat];
+    Fvec_NWZ = inv(rotmat(2,Ang))*Fvec_IJK;
+    
+    % N2L
+    
+    rvecdd_NWZ = Fvec_NWZ ./ Fvec_NWZ;
+    
+        
+    %Calculate Mass Rate of Change as Function of Current Thrust
+    md = -Ft*Mp/It;
+    
+    % repack deriv
+    % xvec = [ rvec ; rvecd ; m ; angle ]
+    % xvecd = [ revd_nwz ; rvecdd_nwz ; md ; angled_nwz ]
+    
+    xvecd = [ rvecd_NWZ; rvecdd_NWZ; md; 0]
+
     %Pack Result Vector
-    res = [A_rocket; Vr; dM];
+    %res = [A_rocket; Vr; dM];
 end
 
 
