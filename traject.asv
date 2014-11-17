@@ -67,6 +67,9 @@ function xvecd = ascent(t, xvec)
 
 global boost;
 global pin;
+global time;
+global mvecd;
+global Tvec;
 
 if t > 6.4
     boost = 0;
@@ -112,12 +115,12 @@ dragvec = -1*(drag_r+drag_p)*rvecdhat;
 
 if boost == 1
     %T = thrust(t);
-    T = 150; % N
+    %T = 150; % N
     %delm = .951 - .355;
     %6.34
-    [~,index] = min(abs(time-t));
+    [~,index] = min(abs(time-t))
     md = mvecd(index);
-    T = force(index);
+    T = Tvec(index);
     %md = -0.09400630915;
 else
     T = 0;
@@ -178,15 +181,15 @@ while cnt == true
 end
 
 
-global time force mass mvecd
+global time Tvec mass mvecd
 
 time = interp(time,100);
-force = interp(force,100);
+Tvec = interp(force,100);
 mass = interp(mass,100);
 mass1 = [0;mass(1:end-1)];
 time1 = [0;time(1:end-1)];
 
-mvecd = (mass-mass1)/(time-time1);
+mvecd = (mass-mass1)./(time-time1);
 
         
     % take data file with motor name and populate global thrust 
