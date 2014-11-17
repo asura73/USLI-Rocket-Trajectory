@@ -149,7 +149,7 @@ function [value,isterminal,direction] = events(t,xvec)
 end
 
 function parseThrust(filename)
-fh = fopen('J530.txt');
+fh = fopen('I242.txt');
 
 time=[];
 mass = [];
