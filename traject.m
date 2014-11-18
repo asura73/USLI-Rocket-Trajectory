@@ -30,6 +30,9 @@ cd_r = 0.5; % rocket cd
 pin = 1*in2m; % pin extention
 boost = 1; % start with motor on
 
+% parse engine data
+
+parseThrust('J530.txt')
 % state space
 
 rvec0 = [0;0;0]; % position in NWZ
@@ -71,7 +74,7 @@ global time;
 global mvecd;
 global Tvec;
 
-if t > 6.4
+if t > max(time)
     boost = 0;
 end
 
@@ -118,10 +121,10 @@ if boost == 1
     %T = 150; % N
     %delm = .951 - .355;
     %6.34
-    [~,index] = min(abs(time-t))
-    md = mvecd(index);
+    [~,index] = min(abs(time-t));
+    %md = mvecd(index);
     T = Tvec(index);
-    %md = -0.09400630915;
+    md = -0.09400630915;
 else
     T = 0;
     md = 0;
@@ -149,7 +152,13 @@ function [value,isterminal,direction] = events(t,xvec)
 end
 
 function parseThrust(filename)
-fh = fopen('J530.txt');
+fh = fopen(filename);
+
+global time;
+global force;
+global mass;
+global Tvec;
+global mvecd;
 
 time=[];
 mass = [];
@@ -181,16 +190,29 @@ while cnt == true
 end
 
 
-global time Tvec mass mvecd
+%define new finer time
+time_new = linspace(0,max(time),1000);
 
-time = interp(time,100);
-Tvec = interp(force,100);
-mass = interp(mass,100);
+%interpolate other variables to fill space of new time vector
+Tvec = interp1(time,force, time_new);
+mass = interp1(time,mass, time_new);
+
+%need to transpose these, interp1 spits out row vector
+%and we need a column vector
+
+time_new = time_new';
+Tvec = Tvec';
+mass = mass';
+
+%calculate average mass rate in new time space
 mass1 = [0;mass(1:end-1)];
-time1 = [0;time(1:end-1)];
+time1 = [0;time_new(1:end-1)];
 
-mvecd = (mass-mass1)./(time-time1);
-
+mvecd = (mass-mass1)./(time_new-time1);
+mvecd(1) = 0;
+mvecd = mvecd/1000;
+%assign new time space to time global variable
+time = time_new;
         
     % take data file with motor name and populate global thrust 
     % vector
