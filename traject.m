@@ -2,7 +2,7 @@ function xvecvec = traject
 
 clear
 clc
-close all
+hold off
 
 d2r = pi / 180;
 r2d = 1 / d2r;
@@ -32,7 +32,7 @@ boost = 1; % start with motor on
 
 % parse engine data
 
-parseThrust('J530.txt')
+parseThrust('I305.txt')
 % state space
 
 rvec0 = [0;0;0]; % position in NWZ
@@ -46,6 +46,24 @@ xvec0 = [rvec0;rvecd0;avec0;m0];
 odeOptions = odeset('RelTol',1e-6,'AbsTol',1e-6,'Events',@events);
 [TOUT, xvecOUT] = ode45(@ascent, [0 1000], xvec0, odeOptions);
 
+% global h_ideal;
+% global time;
+% 
+% h_ideal = [xvecOUT(:,3), TOUT];
+% 
+% boost = 1;
+% global control;
+% global n;
+% n = 1;
+% control = zeros(1500,3);
+
+% global extraBurn;
+% extraBurn = 1;
+% [TOUT_controlled, xvecOUT_controlled] = ode45(@controlled_ascent, [0 1000], xvec0, odeOptions);
+
+% boost = 1;
+% [TOUT_uncontrolled, xvecOUT_uncontrolled] = ode45(@uncontrolled_ascent, [0 1000], xvec0, odeOptions);
+
 x_r = xvecOUT(:,1);
 y_r = xvecOUT(:,2);
 z_r = xvecOUT(:,3);
@@ -53,17 +71,29 @@ z_r = xvecOUT(:,3);
 x_r = x_r * m2ft;
 y_r = y_r * m2ft;
 z_r = z_r * m2ft;
+% z_r_c = xvecOUT_controlled(:,3) * m2ft;
+% z_r_uc = xvecOUT_uncontrolled(:,3) * m2ft;
 
 apogee = z_r(end)
-
-v_r = xvecOUT(:,6);
-
-v_r = v_r * m2ft;
-
-m_r = xvecOUT(:,10);
 plot(TOUT,z_r)
-%plot3(x_r,y_r,z_r)
-%axis equal
+% v_r = xvecOUT(:,6);
+% 
+% v_r = v_r * m2ft;
+% 
+% m_r = xvecOUT(:,10);
+% subplot(2,1,1)
+% plot(TOUT,h_ideal(:,1)*m2ft,'k')
+% hold on
+% plot(TOUT_uncontrolled,z_r_uc,'b')
+% plot(TOUT_controlled,z_r_c,'g')
+% plot(TOUT_controlled,xvecOUT_controlled(:,6)*m2ft,'r')
+% legend('nominal','uncontrolled','controlled','v')
+% subplot(2,1,2)
+% plot(control(:,3),control(:,1),'k')
+% hold on
+% plot(control(:,3),control(:,2),'r')
+% legend('error','pins')
+
 end
 
 function xvecd = ascent(t, xvec)
@@ -97,15 +127,19 @@ g = 9.81;
 % get rocket conditions
 
 cD_r = 0.5;
-cD_p = 0.5;
+cD_p = 1.25;
 
 % sum forces on rocket in rocket frame
 
 
 % drag = .5 * rho * S * V^2 * cD
 
-drag_r = .5*rho*.0082*norm(rvecd)^2*cD_r;
-drag_p = 0;
+servo_angle = 45;
+
+area_p = -0.0000001*servo_angle^2 + 0.00002*servo_angle - 0.0002;
+drag_r = .5*rho*.0045*norm(rvecd)^2*cD_r;
+drag_p = .5*rho*area_p*norm(rvecd)^2*cD_p;
+
 
 v = norm(rvecd);
 if v ~= 0
@@ -128,6 +162,212 @@ if boost == 1
 else
     T = 0;
     md = 0;
+end
+
+F_ijk  = [0;0;T] + dragvec;
+F_nwz = rotmat(2,5*d2r)*F_ijk - [0;0;m*g];
+
+% xvecd = [rvecd ; rvecdd ; avecd ; md]
+
+% newton's second law
+rvecdd = F_nwz ./ m;
+
+xvecd = [rvecd; rvecdd; 0;0;0;md];
+
+end
+
+function xvecd = controlled_ascent(t, xvec)
+
+global boost;
+global pin;
+global time;
+global mvecd;
+global Tvec;
+global h_ideal;
+
+
+% BOOST FOR AN EXTRA HALF SECOND... OOPSS 
+    
+if t > (max(time))
+    boost = 0;
+end
+
+d2r = pi / 180;
+
+% xvec = [rvec ; rvecd ; avec ; m]
+% xvecd = [rvecd ; rvecdd ; avecd ; md]
+
+rvec = xvec(1:3);
+rvecd = xvec(4:6);
+avec = xvec(7:9);
+m = xvec(10);
+
+
+% get atmosphereic conditions
+
+rho = 1.225;
+
+g = 9.81;
+% get rocket conditions
+
+cD_r = 0.5;
+cD_p = 1.25;
+
+% sum forces on rocket in rocket frame
+
+
+% drag = .5 * rho * S * V^2 * cD
+
+
+% change the servo angle based on the error in servo angle
+
+[~,index] = min(abs(h_ideal(:,2)-t));
+z_ideal = h_ideal(index,1);
+
+err = rvec(3) - z_ideal;
+gain = 0.05;
+
+servo_angle = err*gain*norm(rvecd) + 45;
+servo_angle = 90;
+if servo_angle > 90
+    servo_angle = 90;
+elseif servo_angle < 0
+    servo_angle = 0;
+end
+
+
+area_p = -0.0000001*servo_angle^2 + 0.00002*servo_angle - 0.0002;
+drag_r = .5*rho*.0045*norm(rvecd)^2*cD_r;
+drag_p = .5*rho*area_p*norm(rvecd)^2*cD_p;
+
+v = norm(rvecd);
+if v ~= 0
+    rvecdhat = rvecd ./ v;
+else
+    rvecdhat = [0;0;0];
+end
+
+dragvec = -1*(drag_r+drag_p)*rvecdhat;
+
+if boost == 1
+    %T = thrust(t);
+    %T = 150; % N
+    %delm = .951 - .355;
+    %6.34
+    
+    [~,index] = min(abs(time-t));
+    %md = mvecd(index);
+    T = Tvec(index);
+    md = -0.09400630915;
+else
+    T = 0;
+    md = 0;
+end
+
+% error in burn 
+global extraBurn
+if t > 4 && t < (4+extraBurn)
+    T = T + 40;
+end
+
+F_ijk  = [0;0;T] + dragvec;
+F_nwz = rotmat(2,5*d2r)*F_ijk - [0;0;m*g];
+
+global n;
+global control;
+control(n,1) = err;
+control(n,2) = servo_angle;
+control(n,3) = t;
+n = n + 1;
+
+% xvecd = [rvecd ; rvecdd ; avecd ; md]
+
+% newton's second law
+rvecdd = F_nwz ./ m;
+
+xvecd = [rvecd; rvecdd; 0;0;0;md];
+
+end
+
+function xvecd = uncontrolled_ascent(t, xvec)
+
+global boost;
+global pin;
+global time;
+global mvecd;
+global Tvec;
+global h_ideal;
+
+
+% BOOST FOR AN EXTRA HALF SECOND... OOPSS 
+    
+if t > (max(time))
+    boost = 0;
+end
+
+d2r = pi / 180;
+
+% xvec = [rvec ; rvecd ; avec ; m]
+% xvecd = [rvecd ; rvecdd ; avecd ; md]
+
+rvec = xvec(1:3);
+rvecd = xvec(4:6);
+avec = xvec(7:9);
+m = xvec(10);
+
+
+% get atmosphereic conditions
+
+rho = 1.225;
+
+g = 9.81;
+% get rocket conditions
+
+cD_r = 0.5;
+cD_p = 1.25;
+
+% sum forces on rocket in rocket frame
+
+
+% drag = .5 * rho * S * V^2 * cD
+
+
+% change the servo angle based on the error in servo angle
+
+servo_angle = 45;
+
+area_p = -0.0000001*servo_angle^2 + 0.00002*servo_angle - 0.0002;
+drag_r = .5*rho*.0045*norm(rvecd)^2*cD_r;
+drag_p = .5*rho*area_p*norm(rvecd)^2*cD_p;
+v = norm(rvecd);
+
+if v ~= 0
+    rvecdhat = rvecd ./ v;
+else
+    rvecdhat = [0;0;0];
+end
+
+dragvec = -1*(drag_r+drag_p)*rvecdhat;
+
+if boost == 1
+    %T = thrust(t);
+    %T = 150; % N
+    %delm = .951 - .355;
+    %6.34
+    
+    [~,index] = min(abs(time-t));
+    %md = mvecd(index);
+    T = Tvec(index);
+    md = -0.09400630915;
+else
+    T = 0;
+    md = 0;
+end
+
+% error in burn 
+global extraBurn;
+if t > 4 && t < (4+extraBurn)
+    T = T + 40;
 end
 
 F_ijk  = [0;0;T] + dragvec;
@@ -188,7 +428,6 @@ while cnt == true
     
    
 end
-
 
 %define new finer time
 time_new = linspace(0,max(time),1000);
