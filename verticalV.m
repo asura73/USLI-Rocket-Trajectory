@@ -1,4 +1,3 @@
-
 dataFname = 'Altimeter 1 Data - Subscale - Dec 13';
 datalist = xlsread(dataFname); % gets data from the excel file of the alt data  
 
