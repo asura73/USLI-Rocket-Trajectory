@@ -10,8 +10,6 @@ altitude_filtered = zeros(length(altitude),1);
 for i=1:length(altitude)
      % Average buffer
      altitude_filtered(i) = 
-     if altitude(i) < 0
-         altitude_filtered(i) = 
 end
 %plot(time,altitude,'k')
 %hold on
