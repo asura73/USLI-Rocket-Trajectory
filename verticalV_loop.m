@@ -1,5 +1,6 @@
 clear;clc;close all
 dataFname = 'Altimeter 1 Data - Subscale - Dec 13';
+dataFname2 = 'open_rocket_verticalv';
 datalist = xlsread(dataFname); % gets data from the excel file of the alt data  
 
 time = datalist(5:end,1);
@@ -9,7 +10,7 @@ altitude_filtered = zeros(length(altitude),1);
 
 for i=1:length(altitude)
      % Average buffer 
-     if altitude(i) < 0
+     if altitude(i) 
          altitude_filtered(i) = altitude(i-1);
      else
          altitude_filtered(i) = altitude(i);
@@ -26,6 +27,8 @@ for j=1:length(v)
      % Average buffer 
      if abs(v(j)) > 500
          velocity_filtered(j) = 0;
+     elseif v(j)<-50
+         v(j) = 0;
      else
          velocity_filtered(j) = v(j);
      end
@@ -35,9 +38,7 @@ for j=1:length(v)
      else
          time2(j) = 0;
          avgvelocity(j) = 0;
-     end
-     
-    
+     end 
      
 end
 
@@ -45,3 +46,21 @@ end
 data = [time2 avgvelocity];
 
 plot(data(:,1),data(:,2));
+
+hold on
+
+p = fit(data(:,1),data(:,2),'poly9');
+
+plot(p,'k');
+
+hold on
+
+
+datalist2 = xlsread(dataFname2);
+plot(datalist2(:,1),datalist2(:,2),'r');
+
+
+
+
+
+
